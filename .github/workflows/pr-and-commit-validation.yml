@@ -1,10 +1,21 @@
-      # 2️⃣ Commit message validation for dev-1.0.0-* branches
+name: PR and Commit Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Validate commit messages for developer branch
         run: |
           BRANCH_NAME="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
           echo "Current branch: $BRANCH_NAME"
 
-          # Check if branch matches dev-1.0.0-<developername>
           if [[ ! "$BRANCH_NAME" =~ ^dev-1\.0\.0-[a-zA-Z0-9_-]+$ ]]; then
             echo "ℹ️ Skipping commit message validation (branch does not match dev-1.0.0-<developername> format)"
             exit 0
@@ -13,8 +24,8 @@
           echo "🔍 Validating commit messages in branch: $BRANCH_NAME"
           git fetch origin $BRANCH_NAME || true
 
-          # Get commits in PR range
-          COMMITS=$(git log --format=%s origin/${{ github.event.pull_request.base.ref }}..HEAD)
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          COMMITS=$(git log --format=%s origin/$BASE_BRANCH..HEAD)
 
           if [ -z "$COMMITS" ]; then
             echo "⚠️ No new commits found to validate."
@@ -23,21 +34,17 @@
 
           echo "$COMMITS" | while IFS= read -r COMMIT_MSG; do
             [ -z "$COMMIT_MSG" ] && continue
-
             echo "Checking: $COMMIT_MSG"
 
-            # 1️⃣ Length check
             if [ ${#COMMIT_MSG} -le 50 ]; then
               echo "❌ Commit message must be more than 50 characters."
               exit 1
             fi
 
-            # 2️⃣ Task ID check: must start with # and have 5-7 digits
             if ! echo "$COMMIT_MSG" | grep -qE "^#[0-9]{5,7}"; then
               echo "❌ Commit message must start with # followed by 5-7 digits."
               exit 1
             fi
-
           done
 
           echo "✅ All commit messages passed checks."
