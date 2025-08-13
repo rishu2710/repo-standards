@@ -62,7 +62,7 @@ jobs:
             fi
 
             # Task ID format check
-            if ! echo "$COMMIT_MSG" | grep -Eq '#[0-9]{5,7}'; then
+            if ! echo "$COMMIT_MSG" | grep -qE '#[0-9]{5,7}'; then
               echo "❌ Commit message must include a task ID in format: #<5–7 digits>"
               exit 1
             fi
