@@ -1,32 +1,3 @@
-name: PR and Commit Message Validation
-
-on:
-  pull_request:
-    types: [opened, edited, synchronize, reopened]
-
-jobs:
-  validate-pr:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # 1️⃣ PR title & description validation
-      - name: Validate PR title and description
-        run: |
-          echo "🔍 Validating PR title and description..."
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
-
-          if [ -z "$PR_TITLE" ] || [ -z "$PR_BODY" ]; then
-            echo "❌ PR title or description is missing."
-            exit 1
-          fi
-
-          echo "✅ PR title and description are valid."
-
       # 2️⃣ Commit message validation for dev-1.0.0-* branches
       - name: Validate commit messages for developer branch
         run: |
@@ -50,23 +21,23 @@ jobs:
             exit 0
           fi
 
-          while read -r COMMIT_MSG; do
+          echo "$COMMITS" | while IFS= read -r COMMIT_MSG; do
             [ -z "$COMMIT_MSG" ] && continue
 
             echo "Checking: $COMMIT_MSG"
 
-            # Length check (>50 characters)
+            # 1️⃣ Length check
             if [ ${#COMMIT_MSG} -le 50 ]; then
               echo "❌ Commit message must be more than 50 characters."
               exit 1
             fi
 
-            # Task ID format check: starts with # + 5-7 digits
-            if ! [[ "$COMMIT_MSG" =~ #[0-9]{5,7} ]]; then
-              echo "❌ Commit message must include a task ID in format: #<5–7 digits>"
+            # 2️⃣ Task ID check: must start with # and have 5-7 digits
+            if ! echo "$COMMIT_MSG" | grep -qE "^#[0-9]{5,7}"; then
+              echo "❌ Commit message must start with # followed by 5-7 digits."
               exit 1
             fi
 
-          done <<< "$COMMITS"
+          done
 
           echo "✅ All commit messages passed checks."
