@@ -1,0 +1,62 @@
+name: PR Title and Commit Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # fetch all commits so we can read commit messages
+
+      # 1️⃣ Validate PR title
+      - name: Validate PR title
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Checking PR title: $PR_TITLE"
+
+          # Check length > 20
+          if [ ${#PR_TITLE} -le 20 ]; then
+            echo "❌ PR title must be more than 20 characters."
+            exit 1
+          fi
+
+          # Check task ID pattern
+          if ! echo "$PR_TITLE" | grep -qE "#[0-9]{5,7}"; then
+            echo "❌ PR title must contain a task ID like #12345 (5–7 digits)."
+            exit 1
+          fi
+
+          echo "✅ PR title passed validation."
+
+      # 2️⃣ Validate last commit message in PR head branch
+      - name: Validate last commit message
+        run: |
+          BRANCH_NAME="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
+          echo "PR source branch: $BRANCH_NAME"
+
+          # Fetch the latest commits from the source branch
+          git fetch origin "$BRANCH_NAME"
+
+          # Get the last commit message from the PR source branch
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%s origin/"$BRANCH_NAME")
+          echo "Last commit message: $LAST_COMMIT_MSG"
+
+          # Check length > 50
+          if [ ${#LAST_COMMIT_MSG} -le 50 ]; then
+            echo "❌ Last commit message must be more than 50 characters."
+            exit 1
+          fi
+
+          # Check task ID pattern at the end
+          if ! echo "$LAST_COMMIT_MSG" | grep -qE "#[0-9]{5,7}$"; then
+            echo "❌ Last commit message must end with a task ID like #12345 (5–7 digits)."
+            exit 1
+          fi
+
+          echo "✅ Last commit message passed validation."
+          
