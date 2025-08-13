@@ -1,61 +1,69 @@
-name: PR & Commit Message Validation
+name: PR and Commit Message Validation
 
 on:
   pull_request:
-    branches:
-      - dev-1.0.0
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
-  validate-pr-and-commits:
+  validate-pr:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # ------------------------
-      # 1. PR Title & Description Check
-      # ------------------------
-      - name: Check PR title and description length
+      # 1️⃣ PR title & description validation
+      - name: Validate PR title and description
         run: |
-          TITLE="${{ github.event.pull_request.title }}"
-          BODY="${{ github.event.pull_request.body }}"
+          echo "🔍 Validating PR title and description..."
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
 
-          echo "🔍 Checking PR title length..."
-          if [ ${#TITLE} -le 30 ]; then
-            echo "❌ PR title must be more than 30 characters. Current length: ${#TITLE}"
+          if [ -z "$PR_TITLE" ] || [ -z "$PR_BODY" ]; then
+            echo "❌ PR title or description is missing."
             exit 1
           fi
 
-          echo "🔍 Checking PR description length..."
-          if [ ${#BODY} -le 100 ]; then
-            echo "❌ PR description must be more than 100 characters. Current length: ${#BODY}"
-            exit 1
+          echo "✅ PR title and description are valid."
+
+      # 2️⃣ Commit message validation for dev-1.0.0-* branches
+      - name: Validate commit messages for developer branch
+        run: |
+          BRANCH_NAME="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
+          echo "Current branch: $BRANCH_NAME"
+
+          # Check if branch matches dev-1.0.0-<developername>
+          if [[ ! "$BRANCH_NAME" =~ ^dev-1\.0\.0-[a-zA-Z0-9_-]+$ ]]; then
+            echo "ℹ️ Skipping commit message validation (branch does not match dev-1.0.0-<developername> format)"
+            exit 0
           fi
 
-          echo "✅ PR title and description meet requirements."
+          echo "🔍 Validating commit messages in branch: $BRANCH_NAME"
+          git fetch origin $BRANCH_NAME || true
 
-      # ------------------------
-      # 2. Commit Message Check
-      # ------------------------
-      - name: Check commit messages
-        run: |
-          echo "🔍 Validating commit messages in this PR..."
-          COMMITS=$(git log --format=%s origin/${{ github.base_ref }}..HEAD)
+          # Get commits in PR range
+          COMMITS=$(git log --format=%s origin/${{ github.event.pull_request.base.ref }}..HEAD)
+
+          if [ -z "$COMMITS" ]; then
+            echo "⚠️ No new commits found to validate."
+            exit 0
+          fi
 
           while read -r COMMIT_MSG; do
+            [ -z "$COMMIT_MSG" ] && continue
+
             echo "Checking: $COMMIT_MSG"
 
-            # Length check
+            # Length check (>50 characters)
             if [ ${#COMMIT_MSG} -le 50 ]; then
               echo "❌ Commit message must be more than 50 characters."
-              echo "Message: $COMMIT_MSG"
               exit 1
             fi
 
             # Task ID format check
             if ! echo "$COMMIT_MSG" | grep -Eq '#[0-9]{5,7}'; then
               echo "❌ Commit message must include a task ID in format: #<5–7 digits>"
-              echo "Message: $COMMIT_MSG"
               exit 1
             fi
 
