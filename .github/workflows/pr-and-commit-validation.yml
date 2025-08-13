@@ -10,6 +10,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # fetch all history so git log works for comparisons
+
+      - name: Fetch base branch
+        run: |
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Fetching base branch: $BASE_BRANCH"
+          git fetch origin "$BASE_BRANCH"
 
       - name: Validate commit messages for developer branch
         run: |
@@ -21,10 +29,8 @@ jobs:
             exit 0
           fi
 
-          echo "🔍 Validating commit messages in branch: $BRANCH_NAME"
-          git fetch origin $BRANCH_NAME || true
-
           BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "🔍 Validating commit messages between origin/$BASE_BRANCH and HEAD"
           COMMITS=$(git log --format=%s origin/$BASE_BRANCH..HEAD)
 
           if [ -z "$COMMITS" ]; then
