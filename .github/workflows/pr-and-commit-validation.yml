@@ -1,4 +1,4 @@
-name: PR and Commit Validation
+name: PR Title and Commit Validation
 
 on:
   pull_request:
@@ -11,46 +11,51 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # fetch all history so git log works for comparisons
+          fetch-depth: 0 # fetch all commits so we can read commit messages
 
-      - name: Fetch base branch
+      # 1️⃣ Validate PR title
+      - name: Validate PR title
         run: |
-          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          echo "Fetching base branch: $BASE_BRANCH"
-          git fetch origin "$BASE_BRANCH"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Checking PR title: $PR_TITLE"
 
-      - name: Validate commit messages for developer branch
+          # Check length > 20
+          if [ ${#PR_TITLE} -le 20 ]; then
+            echo "❌ PR title must be more than 20 characters."
+            exit 1
+          fi
+
+          # Check task ID pattern
+          if ! echo "$PR_TITLE" | grep -qE "#[0-9]{5,7}"; then
+            echo "❌ PR title must contain a task ID like #12345 (5–7 digits)."
+            exit 1
+          fi
+
+          echo "✅ PR title passed validation."
+
+      # 2️⃣ Validate last commit message in PR head branch
+      - name: Validate last commit message
         run: |
           BRANCH_NAME="${GITHUB_HEAD_REF:-$(git rev-parse --abbrev-ref HEAD)}"
-          echo "Current branch: $BRANCH_NAME"
+          echo "PR source branch: $BRANCH_NAME"
 
-          if [[ ! "$BRANCH_NAME" =~ ^dev-1\.0\.0-[a-zA-Z0-9_-]+$ ]]; then
-            echo "ℹ️ Skipping commit message validation (branch does not match dev-1.0.0-<developername> format)"
-            exit 0
+          # Fetch the latest commits from the source branch
+          git fetch origin "$BRANCH_NAME"
+
+          # Get the last commit message from the PR source branch
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%s origin/"$BRANCH_NAME")
+          echo "Last commit message: $LAST_COMMIT_MSG"
+
+          # Check length > 50
+          if [ ${#LAST_COMMIT_MSG} -le 50 ]; then
+            echo "❌ Last commit message must be more than 50 characters."
+            exit 1
           fi
 
-          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
-          echo "🔍 Validating commit messages between origin/$BASE_BRANCH and HEAD"
-          COMMITS=$(git log --format=%s origin/$BASE_BRANCH..HEAD)
-
-          if [ -z "$COMMITS" ]; then
-            echo "⚠️ No new commits found to validate."
-            exit 0
+          # Check task ID pattern at the end
+          if ! echo "$LAST_COMMIT_MSG" | grep -qE "#[0-9]{5,7}$"; then
+            echo "❌ Last commit message must end with a task ID like #12345 (5–7 digits)."
+            exit 1
           fi
 
-          echo "$COMMITS" | while IFS= read -r COMMIT_MSG; do
-            [ -z "$COMMIT_MSG" ] && continue
-            echo "Checking: $COMMIT_MSG"
-
-            if [ ${#COMMIT_MSG} -le 50 ]; then
-              echo "❌ Commit message must be more than 50 characters."
-              exit 1
-            fi
-
-            if ! echo "$COMMIT_MSG" | grep -qE "^#[0-9]{5,7}"; then
-              echo "❌ Commit message must start with # followed by 5-7 digits."
-              exit 1
-            fi
-          done
-
-          echo "✅ All commit messages passed checks."
+          echo "✅ Last commit message passed validation."
