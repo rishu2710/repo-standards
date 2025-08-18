@@ -1,0 +1,30 @@
+name: Validate PR Source Branch
+
+on:
+  pull_request:
+    branches:
+      - "scan-*.*.*"
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate dev → scan branch rule
+        run: |
+          TARGET="${{ github.base_ref }}"   # e.g. scan-1.0.2
+          SOURCE="${{ github.head_ref }}"   # e.g. dev-1.0.2
+          
+          echo "Target branch: $TARGET"
+          echo "Source branch: $SOURCE"
+
+          # Extract version (X.Y.Z) from scan branch
+          VERSION=$(echo "$TARGET" | sed -E 's/^scan-([0-9]+\.[0-9]+\.[0-9]+)$/\1/')
+          EXPECTED="dev-$VERSION"
+
+          if [ "$SOURCE" != "$EXPECTED" ]; then
+            echo "❌ Invalid PR: Only $EXPECTED can merge into $TARGET"
+            exit 1
+          fi
+
+          echo "✅ PR is valid: $SOURCE → $TARGET"
