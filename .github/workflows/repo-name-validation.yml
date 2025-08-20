@@ -17,9 +17,16 @@ jobs:
           REGEX='^(core|aiops|do|prog)-(tnt|ent)-(ui|svc|lib|infra|dataprocessor|ml|agent)-[a-z0-9-]+$'
           echo "📏 Using regex: $REGEX"
 
+          # Check regex format
           if [[ ! $REPO_NAME =~ $REGEX ]]; then
             echo "❌ ERROR: Repository name '$REPO_NAME' does not follow naming convention."
             exit 1
-          else
-            echo "✅ Repository name '$REPO_NAME' is valid."
           fi
+
+          # Check length constraint
+          if (( ${#REPO_NAME} > 50 )); then
+            echo "❌ ERROR: Repository name '$REPO_NAME' exceeds 50 characters (length=${#REPO_NAME})."
+            exit 1
+          fi
+
+          echo "✅ Repository name '$REPO_NAME' is valid and follows all rules."
