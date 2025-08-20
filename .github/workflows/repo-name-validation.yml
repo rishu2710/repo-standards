@@ -14,7 +14,8 @@ jobs:
           echo "🔎 Full repository path: $GITHUB_REPOSITORY"
           echo "📦 Extracted repository name: $REPO_NAME"
 
-          REGEX='^(core|[a-zA-Z0-9]+)-(tnt|ent)-(ui|svc|lib|infra|dataprocessor|ml|agent)-[a-z0-9-]+$'
+          REGEX='^(core|aiops|do|prog)-(tnt|ent)-(ui|svc|lib|infra|dataprocessor|ml|agent)-[a-z0-9-]+$'
+          echo "📏 Using regex: $REGEX"
 
           if [[ ! $REPO_NAME =~ $REGEX ]]; then
             echo "❌ ERROR: Repository name '$REPO_NAME' does not follow naming convention."
