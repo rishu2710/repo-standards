@@ -1,0 +1,99 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate-branch-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch flow
+        run: |
+          echo "🔍 Validating branch flow rules..."
+
+          SOURCE_BRANCH="${{ github.head_ref }}"
+          TARGET_BRANCH="${{ github.base_ref }}"
+
+          echo "Source: $SOURCE_BRANCH"
+          echo "Target: $TARGET_BRANCH"
+
+          error_exit() {
+            echo "❌ ERROR: $1"
+            exit 1
+          }
+
+          # Regex patterns
+          DEV_PERSONAL_REGEX="^dev-([0-9]+\.[0-9]+\.[0-9]+)-[a-zA-Z0-9_-]+$"
+          DEV_MAIN_REGEX="^dev-([0-9]+\.[0-9]+\.[0-9]+)$"
+          SCAN_REGEX="^scan-([0-9]+\.[0-9]+\.[0-9]+)$"
+          QA_REGEX="^qa-([0-9]+\.[0-9]+\.[0-9]+)$"
+          UAT_REGEX="^uat-([0-9]+\.[0-9]+\.[0-9]+)$"
+          PROD_REGEX="^prod-([0-9]+\.[0-9]+\.[0-9]+)$"
+
+          # Check Dev personal → Dev main
+          if [[ "$SOURCE_BRANCH" =~ $DEV_PERSONAL_REGEX ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            if [[ ! "$TARGET_BRANCH" =~ $DEV_MAIN_REGEX ]]; then
+              error_exit "Branch '$SOURCE_BRANCH' can only be merged into 'dev-$VERSION'"
+            fi
+            if [[ "${BASH_REMATCH[1]}" != "$VERSION" ]]; then
+              error_exit "Version mismatch: $SOURCE_BRANCH → $TARGET_BRANCH"
+            fi
+            echo "✅ Valid: Dev personal → Dev main"
+            exit 0
+          fi
+
+          # Check Dev main → Scan
+          if [[ "$SOURCE_BRANCH" =~ $DEV_MAIN_REGEX ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            if [[ ! "$TARGET_BRANCH" =~ $SCAN_REGEX ]]; then
+              error_exit "Branch '$SOURCE_BRANCH' can only be merged into 'scan-$VERSION'"
+            fi
+            if [[ "${BASH_REMATCH[1]}" != "$VERSION" ]]; then
+              error_exit "Version mismatch: $SOURCE_BRANCH → $TARGET_BRANCH"
+            fi
+            echo "✅ Valid: Dev main → Scan"
+            exit 0
+          fi
+
+          # Check Scan → QA
+          if [[ "$SOURCE_BRANCH" =~ $SCAN_REGEX ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            if [[ ! "$TARGET_BRANCH" =~ $QA_REGEX ]]; then
+              error_exit "Branch '$SOURCE_BRANCH' can only be merged into 'qa-$VERSION'"
+            fi
+            if [[ "${BASH_REMATCH[1]}" != "$VERSION" ]]; then
+              error_exit "Version mismatch: $SOURCE_BRANCH → $TARGET_BRANCH"
+            fi
+            echo "✅ Valid: Scan → QA"
+            exit 0
+          fi
+
+          # Check QA → UAT
+          if [[ "$SOURCE_BRANCH" =~ $QA_REGEX ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            if [[ ! "$TARGET_BRANCH" =~ $UAT_REGEX ]]; then
+              error_exit "Branch '$SOURCE_BRANCH' can only be merged into 'uat-$VERSION'"
+            fi
+            if [[ "${BASH_REMATCH[1]}" != "$VERSION" ]]; then
+              error_exit "Version mismatch: $SOURCE_BRANCH → $TARGET_BRANCH"
+            fi
+            echo "✅ Valid: QA → UAT"
+            exit 0
+          fi
+
+          # Check UAT → PROD
+          if [[ "$SOURCE_BRANCH" =~ $UAT_REGEX ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            if [[ ! "$TARGET_BRANCH" =~ $PROD_REGEX ]]; then
+              error_exit "Branch '$SOURCE_BRANCH' can only be merged into 'prod-$VERSION'"
+            fi
+            if [[ "${BASH_REMATCH[1]}" != "$VERSION" ]]; then
+              error_exit "Version mismatch: $SOURCE_BRANCH → $TARGET_BRANCH"
+            fi
+            echo "✅ Valid: UAT → PROD"
+            exit 0
+          fi
+
+          error_exit "Invalid branch flow: $SOURCE_BRANCH → $TARGET_BRANCH"
